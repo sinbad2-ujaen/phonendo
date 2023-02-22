@@ -130,4 +130,4 @@ dist
 .pnp.*
 
 # database
-storage/phonendo_db
+phonendo_db
