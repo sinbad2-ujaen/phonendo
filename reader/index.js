@@ -1,66 +1,103 @@
 require('dotenv').config();
-const { Express } = require("./core/Express");
-const { promisePostRequest } = require('./core/httpClient')
-
-const DEVICE_TYPE = {
-    Smartwatch: "SMARTWATCH"
-};
+const {Express} = require("./core/Express");
+const {promisePostRequest} = require('./core/httpClient')
+const noble = require('@abandonware/noble');
 
 const EVENT_TYPE = {
     Heartrate: "HEART_RATE"
 }
+
+let discoverableDevices = [];
+let listenablePeripherals = [];
+let listeningPeripherals = [];
+
+initBluetooth();
+listenHeartrateEvents();
 
 const express = new Express(process.env.PORT_READER, "Reader")
 express.get('/', (_, res) => {
     res.send('Service is alive')
 });
 
-express.get('/fakeDevice', (_, res) => {
-    //todo remove fake
-    newDevice()
+express.post('/register', (req, res) => {
+    let device = req.body.device;
+    let serialNumber = req.body.serialNumber;
+    let deviceType = req.body.deviceType;
 
-    res.send('Service is alive')
+    if (device) {
+        console.log("New device received: " + device);
+        discoverableDevices.push(device);
+        let body = {
+            token: process.env.API_TOKEN_MANAGER,
+            device: device,
+            type: deviceType,
+            serialNumber: serialNumber,
+            creationDatetime: new Date().getTime()
+        };
+
+        promisePostRequest(process.env.INTERNAL_URL_MANAGER_REGISTER_DEVICE, body);
+
+        res.status(200).send("Successfully registered");
+
+    } else {
+        res.status(403).send("Bad request");
+    }
 });
 
-express.get('/fakeEvent', (_, res) => {
-    //todo remove fake
-    newEvent()
+async function initBluetooth() {
+    noble.on('stateChange', async (state) => {
+        if (state === 'poweredOn') {
+            await noble.startScanningAsync([], true);
+        }
+    });
 
-    res.send('Service is alive')
-});
+    noble.on('discover', async (peripheral) => {
 
-function initBluetooth() {
-    //todo
+        const isDiscoverable = discoverableDevices.some(device => device === peripheral.id);
+
+        if (isDiscoverable) {
+            listenablePeripherals.push(peripheral);
+            discoverableDevices = discoverableDevices.filter(device => device !== peripheral.id && device !== peripheral.address);
+            await peripheral.connectAsync();
+            console.log('Connected to peripheral:', peripheral.address);
+            console.log('Peripheral name:', peripheral.advertisement.localName);
+            console.log('Peripheral advertisement data:', peripheral.advertisement);
+        }
+    });
 }
 
-function newDevice() {
-    //todo
+async function listenHeartrateEvents() {
 
-    // todo fake data
-    let body = {
-        token: process.env.API_TOKEN_MANAGER,
-        device: "F5:C5:D8:50:BB:D5",
-        type: DEVICE_TYPE.Smartwatch,
-        serialNumber: Math.floor(Math.random() * 10000000),
-        creationDatetime: new Date().getTime()
-    };
+    setInterval(function () {
+        const devicesToListen = listenablePeripherals.filter(item => !listeningPeripherals.includes(item));
 
-    promisePostRequest(process.env.INTERNAL_URL_MANAGER_REGISTER_DEVICE, body);
-}
+        devicesToListen.every(async peripheral => {
+            const {characteristics} = await peripheral.discoverSomeServicesAndCharacteristicsAsync(['180D'], ['2A37']);
 
-function newEvent() {
-    // todo
+            characteristics.forEach(function (characteristic) {
+                characteristic.on('data', function (data, isNotification) {
 
-    // todo fake data
-    let body = {
-        token: process.env.API_TOKEN_MANAGER,
-        type: EVENT_TYPE.Heartrate,
-        value: Math.floor(Math.random() * 200),
-        device: "F5:C5:D8:50:BB:D5",
-        creationDatetime: new Date().getTime()
-    };
+                    let body = {
+                        token: process.env.API_TOKEN_MANAGER,
+                        type: EVENT_TYPE.Heartrate,
+                        value: parseInt(data.toString('hex'), 16),
+                        device: peripheral.id,
+                        creationDatetime: new Date().getTime()
+                    };
 
-    promisePostRequest(process.env.INTERNAL_URL_MANAGER_NEW_EVENT, body);
+                    promisePostRequest(process.env.INTERNAL_URL_MANAGER_NEW_EVENT, body);
+
+                });
+
+                characteristic.subscribe(function (error) {
+                    // Handle the subscription error
+                    console.error("Error", error);
+                });
+            });
+            listeningPeripherals.push(peripheral);
+        });
+
+    }, 3000);
 }
 
 express.run();

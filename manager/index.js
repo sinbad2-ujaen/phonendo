@@ -52,11 +52,11 @@ express.post('/newEvent',async (req, res) => {
     if (!req.body.token || req.body.token !== process.env.API_TOKEN_MANAGER) {
         res.status(401).send('Not authorized');
     } else {
-        console.log("New event received...");
-
         let type = req.body.type;
         let value = req.body.value;
         let device = req.body.device;
+
+        console.log("New event received: " + type + " // " + value + " // " + device);
 
         let message = {
             key: uuidv4(),
@@ -97,8 +97,6 @@ express.post('/newEvent',async (req, res) => {
 
         body.token = process.env.API_TOKEN_STORAGE;
 
-        console.log(body);
-
         // Delete event from Storage
         promiseDeleteRequest(process.env.INTERNAL_URL_STORAGE_EVENTS + "/" + publishedMessage.key, body);
 
@@ -110,11 +108,7 @@ function signDataSource(message) {
 
     const hash = createHash('sha256').update(message.value.device + 'Phonendo').digest('hex');
 
-    console.log("hash2", hash);
-
     const bytes = toBytes(hash);
-
-    console.log("bytes", bytes);
 
     return message;
 }
