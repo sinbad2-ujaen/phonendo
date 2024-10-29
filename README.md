@@ -26,6 +26,14 @@
     Phonendo is a platform consisting of several software services that manages the entire data lifecycle from wearable device data collection to publishing them on IOTA.
     <br />
     <br />
+    Phonendo is published on Wireless Networks https://link.springer.com/article/10.1007/s11276-023-03458-7 and can be cited:
+    
+    Moya, F., Quesada, F.J., Martínez, L. et al. 
+    Phonendo: a platform for publishing wearable data on distributed ledger technologies. 
+    Wireless Netw (2023). 
+    https://doi.org/10.1007/s11276-023-03458-7
+  <br />
+    <br />
     <a href="https://github.com/sinbad2-ujaen/phonendo/blob/main/demo/phonendo_demo.mp4">View Demo</a>
     ·
     <a href="https://github.com/sinbad2-ujaen/phonendo/issues">Report Bug / Request Feature</a>
